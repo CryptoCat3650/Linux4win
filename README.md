@@ -17,4 +17,6 @@ Installation
 
 Downloads are to be found at the releases page: https://github.com/CryptoCat3650/Linux4win/releases/
 
-After downloading double-click the Linux4win.bat file.
+Press the download button, if "windows has protected your pc" comes up when you open the batch file press "More Info" and "Allow Anyways"
+
+VirusTotal Virus Check Link: https://www.virustotal.com/gui/file/930541d303dc6c5d2aa5a938143fe268fe2332e766050f7fd286b22976567008/detection
