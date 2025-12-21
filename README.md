@@ -16,3 +16,5 @@ Linux4win requires windows 10 version 1803 or later (windows 11 works)
 Installation
 
 Downloads are to be found at the releases page: https://github.com/CryptoCat3650/Linux4win/releases/
+
+After downloading double-click the Linux4win.bat file.
