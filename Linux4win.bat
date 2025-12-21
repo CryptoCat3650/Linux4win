@@ -33,7 +33,17 @@ echo ./ - runs a program in the current directory
 echo sudo apt install steam - downloads and installs steam
 echo sudo apt install firefox - downloads and installs firefox
 echo sudo apt install vlc - downloads and installs vlc media player
+echo sudo apt install roblox - downloads and installs roblox
+echo sudo apt install spotify - downloads and installs spotify
+echo sudo apt install office365 - downloads and installs microsoft office 365
 echo sudo apt update - updates operating system and drivers
+echo cmd - opens a windows cmd shell
+echo sudo reboot - reboots the computer
+echo sudo shutdown - shuts down the computer
+echo sudo logout - logs out the current user
+echo read -p "prompt" varname - displays a prompt and waits for user input to store in variable
+echo read -p - creates a pause until user presses any key
+echo read -p -n - creates a pause until user presses any key without displaying "Press any key to continue..."
 echo.
 echo remember to run the batch file as administrator for full functionality for commands like sudo apt update
 echo.
@@ -58,6 +68,7 @@ set /p commandinterperter="[32m%username%@%hostname%[0m:[34m%CD%[0m$ "
 goto commandforfirst
 
 :startagain
+
 title Linux4win
 set "commandinterperter="
 FOR /F "tokens=*" %%i IN ('hostname') DO SET hostname=%%i
@@ -65,8 +76,8 @@ set /p commandinterperter="[32m%username%@%hostname%[0m:[34m%CD%[0m$ "
 if "!commandinterperter!"=="" (
     goto startagain
 )
-:commandforfirst
 
+:commandforfirst
 
 if /i "!commandinterperter:~0,2!"=="cd" (
     title Linux4win - ls
@@ -105,7 +116,7 @@ exit /b
 )
 
 if /i "!commandinterperter:~0,3!"=="cat" (
-    Linux4win - cat
+    title Linux4win - cat
     type !commandinterperter:~3!
     echo.
     if not defined IN_SCRIPT goto startagain
@@ -345,13 +356,6 @@ if /i "!commandinterperter!"=="read -p -n" (
 exit /b
 )
 
-if /i "!commandinterperter!"=="read -p -n" (
-    title Linux4win - read
-    pause>nul
-    if not defined IN_SCRIPT goto startagain
-exit /b
-)
-
 echo !commandinterperter! | findstr "=" >nul
 if not errorlevel 1 (
     for /f "tokens=1,2 delims==" %%A in ("!commandinterperter!") do (
@@ -361,6 +365,32 @@ if not errorlevel 1 (
     exit /b
 )
 
+for /f "tokens=1,2,* delims= " %%A in ("!commandinterperter!") do (
+    if /i "%%A %%B"=="read -p" (
+        for /f "tokens=1,2" %%P in ("%%C") do (
+            set "prompt=%%~P"
+            set "varname=%%Q"
+        )
+        set /p !varname!=!prompt!
+        exit /b
+    )
+)
+
+
+if /i "!commandinterperter!"=="read -p -n" (
+    title Linux4win - read
+    pause>nul
+    if not defined IN_SCRIPT goto startagain
+exit /b
+)
+:: if [-f "%something%" ] then echo here else echo no
+echo !commandinterperter! | findstr /i "^if \[" >nul
+if not errorlevel 1 (
+    call :if
+    rem STOP the shell from executing the line again
+    goto :eof
+)
+
 
 if /i "!commandinterperter:~-3!"==".sh" (
     call :runsh "!commandinterperter!"
@@ -368,28 +398,11 @@ if /i "!commandinterperter:~-3!"==".sh" (
 exit /b
 )
 
-for /f "tokens=1,2,* delims= " %%A in ("!commandinterperter!") do (
-    if /i "%%A %%B"=="read -p" (
-        set "rest=%%C"
-        for /f "tokens=1*" %%P in ("!rest!") do (
-            set "prompt=%%~P"
-            set "varname=%%Q"
-        )
-        title Linux4win - read
-        set /p !varname!=!prompt!
-        if not defined IN_SCRIPT goto startagain
-        exit /b
-    )
-)
-
-
-
-
 where "!commandinterperter!" >nul 2>nul
 if errorlevel 1 (
     echo !commandinterperter!: Command not found
 ) else (
-    "!commandinterperter!"
+    call cmd /c "!commandinterperter!"
 )
 if not defined IN_SCRIPT goto startagain
 exit /b
@@ -406,9 +419,9 @@ set "shfile=%~1"
 
 if not exist "%shfile%" (
     echo %shfile%: No such file
+    set "IN_SCRIPT="
     exit /b
 )
-
 
 for /f "usebackq delims=" %%L in ("%shfile%") do (
     set "line=%%L"
@@ -420,12 +433,12 @@ set "SCRIPT_ECHO="
 exit /b
 
 :execshline
-setlocal enabledelayedexpansion
+rem -- DO NOT setlocal here (we want variable assignments to persist) --
 
+rem trim leading spaces
 for /f "tokens=* delims= " %%A in ("!line!") do set "line=%%A"
 
 if "!line!"=="" exit /b
-
 if "!line:~0,1!"=="#" exit /b
 
 if /i "!line!"=="stty -echo" (
@@ -434,14 +447,61 @@ if /i "!line!"=="stty -echo" (
 )
 
 if /i "!line!"=="stty echo" (
-    endlocal & set "SCRIPT_ECHO=1"
+    set "SCRIPT_ECHO=1"
+
     exit /b
 )
 
+
 if defined SCRIPT_ECHO echo ^$ !line!
+
+rem variable assignment detection inside script lines
+echo !line! | findstr "=" >nul
+if not errorlevel 1 (
+    for /f "tokens=1,2 delims==" %%A in ("!line!") do (
+        set "%%A=%%B"
+        set "SCRIPT_VAR=1"
+    )
+)
 
 set "commandinterperter=!line!"
 call :commandforfirst
 
-endlocal
+exit /b
+
+
+
+
+
+
+
+
+
+:if
+rem --- extract filename token (3rd token) ---
+for /f "tokens=4 delims= " %%A in ("!commandinterperter!") do set "filevar=%%A"
+
+rem --- remove quotes and brackets ---
+set "filevar=!filevar:"=!"
+set "filevar=!filevar:]=!"
+
+rem --- extract then / else commands ---
+set "after_then=!commandinterperter:*then =!"
+for /f "tokens=1* delims=~" %%X in ("!after_then: else=~!") do (
+    set "then_cmd=%%X"
+    set "else_cmd=%%Y"
+)
+
+rem --- expand environment variables in filevar ---
+call set "filevar_expanded=!filevar!"
+
+rem --- check file existence ---
+if exist "!filevar_expanded!" (
+    cmd /c "!then_cmd!"
+) else (
+    cmd /c "!else_cmd!"
+)
+
+set "commandinterperter="
+if not defined IN_SCRIPT goto startagain
 exit /b
