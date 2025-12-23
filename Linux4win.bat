@@ -54,6 +54,8 @@ goto startagain
 :Start
 title Linux4win
 setlocal enabledelayedexpansion
+set "FUNC_DIR=%TEMP%\linux4win_funcs"
+mkdir "%FUNC_DIR%" 2>nul
 cls
 echo Welcome to [33mLinux[0m4[34mwin[0m. This environment was created by [95mCryptoCat[0m, Enjoy.
 echo.
@@ -108,9 +110,16 @@ exit /b
 )
 
 
+if /i "!commandinterperter:~0,5!"=="rmdir" (
+    title Linux4win - rmdir
+    rd /s /q !commandinterperter:~5!
+    if not defined IN_SCRIPT goto startagain
+exit /b
+)
+
 if /i "!commandinterperter:~0,2!"=="rm" (
     title Linux4win - rm
-    rd !commandinterperter:~2!
+    del /f /q !commandinterperter:~2!
     if not defined IN_SCRIPT goto startagain
 exit /b
 )
@@ -367,14 +376,35 @@ if not errorlevel 1 (
 
 for /f "tokens=1,2,* delims= " %%A in ("!commandinterperter!") do (
     if /i "%%A %%B"=="read -p" (
-        for /f "tokens=1,2" %%P in ("%%C") do (
+        set "rest=%%C"
+
+        rem --- extract prompt and variable name
+        for /f "tokens=1*" %%P in ("!rest!") do (
             set "prompt=%%~P"
-            set "varname=%%Q"
+            set "realvar=%%Q"
         )
-        set /p !varname!=!prompt!
+
+        title Linux4win - read
+
+        rem --- read input
+        set /p "input=!prompt!"
+
+        rem --- store into the real variable
+        set "!realvar!=!input!"
+
+        rem --- **also update the command line in the script** so echo works
+        set "line=!line:!realvar!=!input!!"
+
+        rem --- clear helpers
+        set "input="
+        set "prompt="
+        set "realvar="
+
+        if not defined IN_SCRIPT goto startagain
         exit /b
     )
 )
+
 
 
 if /i "!commandinterperter!"=="read -p -n" (
@@ -383,11 +413,9 @@ if /i "!commandinterperter!"=="read -p -n" (
     if not defined IN_SCRIPT goto startagain
 exit /b
 )
-:: if [-f "%something%" ] then echo here else echo no
 echo !commandinterperter! | findstr /i "^if \[" >nul
 if not errorlevel 1 (
     call :if
-    rem STOP the shell from executing the line again
     goto :eof
 )
 
@@ -424,84 +452,65 @@ if not exist "%shfile%" (
 )
 
 for /f "usebackq delims=" %%L in ("%shfile%") do (
-    set "line=%%L"
-    call :execshline
+    call :execshline "%%L"
 )
+
 
 set "IN_SCRIPT="
 set "SCRIPT_ECHO="
 exit /b
 
 :execshline
-rem -- DO NOT setlocal here (we want variable assignments to persist) --
-
-rem trim leading spaces
+set "line=%~1"
 for /f "tokens=* delims= " %%A in ("!line!") do set "line=%%A"
-
 if "!line!"=="" exit /b
 if "!line:~0,1!"=="#" exit /b
-
-if /i "!line!"=="stty -echo" (
-    endlocal & set "SCRIPT_ECHO="
-    exit /b
-)
-
-if /i "!line!"=="stty echo" (
-    set "SCRIPT_ECHO=1"
-
-    exit /b
-)
-
-
-if defined SCRIPT_ECHO echo ^$ !line!
-
-rem variable assignment detection inside script lines
-echo !line! | findstr "=" >nul
+if /i "!line!"=="stty -echo" (set "SCRIPT_ECHO=" & exit /b)
+if /i "!line!"=="stty echo" (set "SCRIPT_ECHO=1" & exit /b)
+echo !line! | findstr /r "^[a-zA-Z0-9_]*() " >nul
 if not errorlevel 1 (
-    for /f "tokens=1,2 delims==" %%A in ("!line!") do (
-        set "%%A=%%B"
-        set "SCRIPT_VAR=1"
+    for /f "tokens=1,* delims= " %%A in ("!line!") do (
+        set "fname=%%A"
+        set "fbody=%%B"
     )
+    set "fname=!fname:()=!"
+    > "%FUNC_DIR%\!fname!.cmd" echo !fbody!
+    exit /b
 )
-
+if exist "%FUNC_DIR%\!line!.cmd" (
+    call "%FUNC_DIR%\!line!.cmd"
+    exit /b
+)
 set "commandinterperter=!line!"
-call :commandforfirst
-
+call :dispatch
 exit /b
 
 
+:dispatch
+if /i "!commandinterperter!"=="echo" (
+    echo.
+    exit /b
+)
 
-
-
-
-
+call :commandforfirst
+exit /b
 
 
 :if
-rem --- extract filename token (3rd token) ---
 for /f "tokens=4 delims= " %%A in ("!commandinterperter!") do set "filevar=%%A"
-
-rem --- remove quotes and brackets ---
 set "filevar=!filevar:"=!"
 set "filevar=!filevar:]=!"
-
-rem --- extract then / else commands ---
 set "after_then=!commandinterperter:*then =!"
 for /f "tokens=1* delims=~" %%X in ("!after_then: else=~!") do (
     set "then_cmd=%%X"
     set "else_cmd=%%Y"
 )
-
-rem --- expand environment variables in filevar ---
 call set "filevar_expanded=!filevar!"
-
-rem --- check file existence ---
 if exist "!filevar_expanded!" (
     cmd /c "!then_cmd!"
 ) else (
     cmd /c "!else_cmd!"
 )
-
 set "commandinterperter="
 if not defined IN_SCRIPT goto startagain
 exit /b
